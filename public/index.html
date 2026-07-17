@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Configure lead searches, run the scraper, and review previous and newly generated Excel workbooks."
+    />
+    <title>Lead Scraper Dashboard</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="img">
+              <path d="M5 4.5h14v4H5zM5 10h9v4H5zM5 15.5h14v4H5z" />
+              <circle cx="17" cy="12" r="2.5" />
+            </svg>
+          </div>
+          <div>
+            <span class="eyebrow">Workspace</span>
+            <strong>Lead Scraper</strong>
+          </div>
+        </div>
+
+        <div class="sidebar-heading">
+          <div>
+            <span class="section-kicker">Search setup</span>
+            <h2>Configure run</h2>
+          </div>
+          <span class="saved-label" id="saved-label">Local</span>
+        </div>
+
+        <form id="scrape-form">
+          <label class="field">
+            <span>City</span>
+            <input id="city" name="city" type="text" maxlength="100" required />
+          </label>
+
+          <label class="field">
+            <span>Local keywords</span>
+            <small>One keyword per line</small>
+            <textarea id="local-keywords" name="localKeywords" rows="4" required></textarea>
+          </label>
+
+          <label class="field field-grow">
+            <span>Areas</span>
+            <small>One Bengaluru area per line</small>
+            <textarea id="areas" name="areas" rows="9" required></textarea>
+          </label>
+
+          <div class="toggle-row">
+            <div>
+              <span class="toggle-title">B2B sources</span>
+              <small>IndiaMART and TradeIndia</small>
+            </div>
+            <label class="switch">
+              <input id="include-b2b" type="checkbox" />
+              <span aria-hidden="true"></span>
+              <span class="sr-only">Include B2B sources</span>
+            </label>
+          </div>
+
+          <label class="field b2b-field" id="b2b-field">
+            <span>B2B queries</span>
+            <small>One query per line</small>
+            <textarea id="b2b-queries" name="b2bQueries" rows="4"></textarea>
+          </label>
+
+          <div class="two-column-fields">
+            <label class="field">
+              <span>Results / search</span>
+              <input id="max-results" type="number" min="1" max="100" required />
+            </label>
+            <label class="field">
+              <span>Query limit</span>
+              <input id="query-limit" type="number" min="0" max="100000" required />
+              <small>0 means all</small>
+            </label>
+          </div>
+
+          <div class="toggle-row compact-toggle">
+            <div>
+              <span class="toggle-title">Run browser hidden</span>
+              <small>Recommended for normal runs</small>
+            </div>
+            <label class="switch">
+              <input id="headless" type="checkbox" />
+              <span aria-hidden="true"></span>
+              <span class="sr-only">Run browser hidden</span>
+            </label>
+          </div>
+
+          <div class="run-summary">
+            <span>Planned searches</span>
+            <strong id="planned-searches">0</strong>
+          </div>
+
+          <button class="primary-button" id="run-button" type="submit">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m8 5 11 7-11 7V5Z" />
+            </svg>
+            <span id="run-button-label">Generate new leads</span>
+          </button>
+          <p class="form-message" id="form-message" role="alert"></p>
+        </form>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <div>
+            <span class="section-kicker">Lead operations</span>
+            <h1>Workbook overview</h1>
+            <p>Review the last dataset, run a fresh search, and compare the results.</p>
+          </div>
+          <div class="status-pill" id="status-pill" data-state="idle">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span id="status-text">Ready</span>
+          </div>
+        </header>
+
+        <section class="run-panel" aria-labelledby="run-status-title">
+          <div class="run-panel-copy">
+            <div class="run-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M12 3a9 9 0 1 0 9 9" />
+                <path d="M12 7v5l3 2" />
+                <path d="M17 3h4v4" />
+                <path d="m21 3-4.5 4.5" />
+              </svg>
+            </div>
+            <div>
+              <span class="section-kicker">Current activity</span>
+              <h2 id="run-status-title">No scraper running</h2>
+              <p id="run-status-detail">Configure your search and generate a new workbook when ready.</p>
+            </div>
+          </div>
+          <div class="progress-wrap">
+            <div class="progress-labels">
+              <span id="progress-label">Waiting to start</span>
+              <strong id="progress-percent">0%</strong>
+            </div>
+            <progress id="run-progress" value="0" max="100">0%</progress>
+          </div>
+        </section>
+
+        <section class="dataset-section" aria-labelledby="datasets-title">
+          <div class="section-title-row">
+            <div>
+              <span class="section-kicker">Excel history</span>
+              <h2 id="datasets-title">Your lead datasets</h2>
+            </div>
+            <button class="secondary-button" id="refresh-button" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M20 7v5h-5M4 17v-5h5" />
+                <path d="M6.1 9A7 7 0 0 1 18.5 6.5L20 8M4 16l1.5 1.5A7 7 0 0 0 17.9 15" />
+              </svg>
+              Refresh
+            </button>
+          </div>
+
+          <div class="dataset-cards">
+            <button class="dataset-card" id="previous-card" data-kind="previous" type="button">
+              <span class="file-icon previous-icon" aria-hidden="true">XLS</span>
+              <span class="dataset-card-copy">
+                <span class="dataset-label">Previous workbook</span>
+                <strong id="previous-count">—</strong>
+                <span id="previous-meta">Checking for file…</span>
+              </span>
+              <span class="card-arrow" aria-hidden="true">→</span>
+            </button>
+
+            <button class="dataset-card active" id="latest-card" data-kind="latest" type="button">
+              <span class="file-icon latest-icon" aria-hidden="true">XLS</span>
+              <span class="dataset-card-copy">
+                <span class="dataset-label">Latest generated</span>
+                <strong id="latest-count">—</strong>
+                <span id="latest-meta">Checking for file…</span>
+              </span>
+              <span class="new-badge">Latest</span>
+              <span class="card-arrow" aria-hidden="true">→</span>
+            </button>
+          </div>
+        </section>
+
+        <section class="table-panel" aria-labelledby="table-title">
+          <div class="table-toolbar">
+            <div>
+              <div class="table-title-line">
+                <h2 id="table-title">Latest generated leads</h2>
+                <span class="row-badge" id="row-badge">0 rows</span>
+              </div>
+              <p id="active-file-name">No workbook available</p>
+            </div>
+            <div class="toolbar-actions">
+              <label class="search-box">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="11" cy="11" r="6.5" />
+                  <path d="m16 16 4 4" />
+                </svg>
+                <span class="sr-only">Search workbook</span>
+                <input id="table-search" type="search" placeholder="Search all columns…" />
+              </label>
+              <a class="download-button disabled" id="download-button" href="#" aria-disabled="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 20h14" />
+                </svg>
+                Download Excel
+              </a>
+            </div>
+          </div>
+
+          <div class="table-scroll">
+            <table>
+              <thead id="lead-head"></thead>
+              <tbody id="lead-body">
+                <tr>
+                  <td class="empty-cell">Loading workbook…</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="table-footer">
+            <span id="page-summary">No rows to display</span>
+            <div class="pagination">
+              <button id="previous-page" type="button" aria-label="Previous page">←</button>
+              <span id="page-indicator">Page 1 of 1</span>
+              <button id="next-page" type="button" aria-label="Next page">→</button>
+            </div>
+          </div>
+        </section>
+
+        <details class="log-panel" id="log-panel">
+          <summary>
+            <span>
+              <span class="terminal-mark" aria-hidden="true">&gt;_</span>
+              Run log
+            </span>
+            <span id="log-count">0 messages</span>
+          </summary>
+          <div class="log-output" id="log-output">No run messages yet.</div>
+        </details>
+      </main>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="/app.js" defer></script>
+  </body>
+</html>

@@ -1,10 +1,13 @@
 {
   "name": "ai-scraper",
   "version": "1.0.0",
-  "description": "",
+  "description": "Local lead scraper with an Excel review dashboard",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js",
+    "server": "node server.js",
+    "scrape": "node index.js",
+    "check": "node --check index.js && node --check server.js && node --check public/app.js"
   },
   "keywords": [],
   "author": "",

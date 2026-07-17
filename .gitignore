@@ -1,0 +1,12 @@
+node_modules/
+.env
+.env.*
+~$*
+*.tmp-*
+
+# Workbooks created by dashboard runs
+latest_leads.csv
+latest_leads.xlsx
+latest_leads_new.xlsx
+previous_leads.xlsx
+scraper-config.json

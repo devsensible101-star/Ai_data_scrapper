@@ -7,44 +7,56 @@ const path = require("path");
 const puppeteer = require("puppeteer");
 const XLSX = require("xlsx");
 
-const CITY = "Bengaluru";
-const LOCAL_KEYWORDS = ["RFID", "HRMS", "ERP", "Access Control"];
-const AREAS = [
-  // "South Bengaluru",
-  // "Jayanagar",
-  // "JP Nagar",
-  // "Banashankari",
-  // "BTM Layout",
-  // "Koramangala",
-  // "HSR Layout",
-  // "Bommanahalli",
-  // "Bommasandra",
-  // "Electronic City",
-  // "Begur",
-  // "Arekere",
-  "Hulimavu",
-  "Gottigere",
-  "Bannerghatta Road",
-  "Anjanapura",
-  "Uttarahalli",
-"Kumaraswamy Layout",
-"Padmanabhanagar",
-"Girinagar",
-"Basaveshwar Nagar",
-"Kanakapura Road",
-"Talaghattapura",
-"Konanakunte",
-"Kothanur (South)",
-];
-const B2B_QUERIES = [
-  "pos machine supplier",
-  "billing machine dealer",
-  "restaurant billing software provider"
-];
+const DEFAULT_SCRAPER_CONFIG = {
+  city: "Bengaluru",
+  localKeywords: ["RFID", "HRMS", "ERP", "Access Control"],
+  areas: [
+    "South Bengaluru",
+    "Jayanagar",
+    "JP Nagar",
+    "Banashankari",
+    "BTM Layout",
+    "Koramangala",
+    "HSR Layout",
+    "Bommanahalli",
+    "Bommasandra",
+    "Electronic City",
+    "Begur",
+    "Arekere",
+    "Hulimavu",
+    "Gottigere",
+    "Bannerghatta Road",
+    "Anjanapura",
+    "Uttarahalli",
+    "Kumaraswamy Layout",
+    "Padmanabhanagar",
+    "Girinagar",
+    "Basaveshwar Nagar",
+    "Kanakapura Road",
+    "Talaghattapura",
+    "Konanakunte",
+    "Kothanur (South)"
+  ],
+  b2bQueries: [
+    "pos machine supplier",
+    "billing machine dealer",
+    "restaurant billing software provider"
+  ],
+  includeB2b: false,
+  headless: true,
+  maxResults: 15,
+  queryLimit: 0
+};
 
-const HEADLESS = readBooleanEnv("HEADLESS", true);
+const CITY = cleanText(process.env.SCRAPER_CITY || DEFAULT_SCRAPER_CONFIG.city);
+const LOCAL_KEYWORDS = readListEnv("SCRAPER_LOCAL_KEYWORDS", DEFAULT_SCRAPER_CONFIG.localKeywords);
+const AREAS = readListEnv("SCRAPER_AREAS", DEFAULT_SCRAPER_CONFIG.areas);
+const B2B_QUERIES = readListEnv("SCRAPER_B2B_QUERIES", DEFAULT_SCRAPER_CONFIG.b2bQueries);
+const ENABLE_B2B = readBooleanEnv("ENABLE_B2B", DEFAULT_SCRAPER_CONFIG.includeB2b);
+
+const HEADLESS = readBooleanEnv("HEADLESS", DEFAULT_SCRAPER_CONFIG.headless);
 const MAX_RETRIES = readIntegerEnv("MAX_RETRIES", 1, 0, 5);
-const MAX_RESULTS = readIntegerEnv("MAX_RESULTS", 15, 1, 100);
+const MAX_RESULTS = readIntegerEnv("MAX_RESULTS", DEFAULT_SCRAPER_CONFIG.maxResults, 1, 100);
 const MAX_SCROLL_ATTEMPTS = readIntegerEnv("MAX_SCROLL_ATTEMPTS", 8, 1, 50);
 const PLACE_CONCURRENCY = Math.max(
   1,
@@ -54,13 +66,14 @@ const SEARCH_CONCURRENCY = Math.max(
   1,
   Math.min(readIntegerEnv("SEARCH_CONCURRENCY", 2, 1, 3), 3)
 );
-const QUERY_LIMIT = readIntegerEnv("QUERY_LIMIT", 0, 0, 100000);
+const QUERY_LIMIT = readIntegerEnv("QUERY_LIMIT", DEFAULT_SCRAPER_CONFIG.queryLimit, 0, 100000);
 const DETAIL_WAIT_MS = readIntegerEnv("DETAIL_WAIT_MS", 8000, 1000, 120000);
 const CHECKPOINT_EVERY = readIntegerEnv("CHECKPOINT_EVERY", 5, 1, 10000);
 const SCRAPER_FILTER = normalizeKeyText(process.env.SCRAPER_FILTER || "");
 const BROWSER_EXECUTABLE_PATH = resolveBrowserExecutablePath();
-const OUTPUT_FILE = "combined_leads.xlsx";
-const CSV_OUTPUT_FILE = "combined_leads.csv";
+const OUTPUT_FILE = readPathEnv("OUTPUT_FILE", "combined_leads.xlsx");
+const CSV_OUTPUT_FILE = readPathEnv("CSV_OUTPUT_FILE", "combined_leads.csv");
+const EXISTING_LEADS_FILE = readPathEnv("EXISTING_LEADS_FILE", "");
 const OUTPUT_COLUMNS = ["name", "phone", "address", "category", "city", "source"];
 const BLOCKED_RESOURCE_TYPES = new Set(["image", "font", "media"]);
 const MAX_ACTIVE_BROWSER_PAGES = Math.max(SEARCH_CONCURRENCY, PLACE_CONCURRENCY);
@@ -228,12 +241,12 @@ function buildSearches() {
     })
   );
 
-  const b2bSearches = [];
-  // To enable B2B sources, replace the line above with:
-  // const b2bSearches = B2B_QUERIES.flatMap((text) => [
-  //   { source: "IndiaMART", type: "b2b", category: text, city: CITY, text },
-  //   { source: "TradeIndia", type: "b2b", category: text, city: CITY, text }
-  // ]);
+  const b2bSearches = ENABLE_B2B
+    ? B2B_QUERIES.flatMap((text) => [
+        { source: "IndiaMART", type: "b2b", category: text, city: CITY, text },
+        { source: "TradeIndia", type: "b2b", category: text, city: CITY, text }
+      ])
+    : [];
 
   const allSearches = [...localSearches, ...b2bSearches];
   if (!SCRAPER_FILTER) return allSearches;
@@ -1095,7 +1108,7 @@ function mergeLeadsIntoState(state, leads) {
 }
 
 function loadExistingLeads() {
-  const candidates = [CSV_OUTPUT_FILE, OUTPUT_FILE];
+  const candidates = uniqueValues([EXISTING_LEADS_FILE, CSV_OUTPUT_FILE, OUTPUT_FILE]);
 
   for (const filePath of candidates) {
     if (!fs.existsSync(filePath)) continue;
@@ -1649,6 +1662,30 @@ function readBooleanEnv(name, fallback) {
   return fallback;
 }
 
+function readListEnv(name, fallback) {
+  const rawValue = process.env[name];
+  if (rawValue == null || rawValue === "") return [...fallback];
+
+  let values = [];
+  try {
+    const parsed = JSON.parse(rawValue);
+    if (Array.isArray(parsed)) values = parsed;
+    else if (typeof parsed === "string") values = parsed.split(/\r?\n|,/);
+  } catch (error) {
+    values = String(rawValue).split(/\r?\n|,/);
+  }
+
+  const cleanedValues = uniqueValues(values);
+  if (cleanedValues.length > 0) return cleanedValues;
+
+  console.warn(`${name} is invalid or empty; using default values`);
+  return [...fallback];
+}
+
+function readPathEnv(name, fallback) {
+  return cleanText(process.env[name] || "") || fallback;
+}
+
 function resolveBrowserExecutablePath() {
   const configuredPath = cleanText(process.env.PUPPETEER_EXECUTABLE_PATH || "");
   if (configuredPath) {
@@ -1745,6 +1782,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  DEFAULT_SCRAPER_CONFIG,
   cleanPhone,
   cleanText,
   dedupeLeads,
